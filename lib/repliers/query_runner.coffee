@@ -11,7 +11,6 @@ module.exports = class QueryRunner extends FancyReplier
   postImage: (query, imageData, options = {}) ->
     if @replyContext.looker.storeBlob
       success = (url) =>
-        share = if @showShareUrl() then query.share_url else ""
         @reply(
           attachments: [
             _.extend({}, options, {
@@ -25,7 +24,19 @@ module.exports = class QueryRunner extends FancyReplier
         )
       error = (error, context) =>
         @reply(":warning: *#{context}* #{error}")
-      @replyContext.looker.storeBlob(imageData, success, error)
+
+      # Heuristic: check if PNG has more than 80% '0's. If so, we pretend it has no result.
+      zeroes = 0
+      for i in [0..imageData.length-1]
+        if imageData[i] == 0
+          zeroes += 1
+      zeroPercent = 100.0 * zeroes / imageData.length
+      console.log("percent of PNG are zeroes? #{zeroPercent}")
+      share = if @showShareUrl() then query.share_url else ""
+      if (zeroPercent > 80 || imageData.length == 0)
+        @reply("#{share}\nNo results.")
+      else
+        @replyContext.looker.storeBlob(imageData, success, error)
     else
       @reply(":warning: No storage is configured for visualization images in the bot configuration.")
 
